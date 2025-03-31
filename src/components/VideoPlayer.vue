@@ -1,5 +1,30 @@
 <!-- VideoPlayer.vue -->
 <template>
+
+  <!-- 新增重复次数设置弹窗 -->
+  <div v-if="showRepeatDialog" class="completion-dialog">
+    <div class="dialog-content">
+      <button class="close-btn" @click="closeRepeatDialog">×</button>
+      <h2>🏋️ 设置训练次数</h2>
+      <div class="repeat-picker">
+        <button class="repeat-btn" @click="adjustRepeat(-1)">-</button>
+        <input
+          type="number"
+          v-model.number="localRepeatTimes"
+          min="1"
+          max="10"
+          class="repeat-input"
+          @keydown.prevent
+        >
+        <button class="repeat-btn" @click="adjustRepeat(1)">+</button>
+      </div>
+      <div class="dialog-buttons">
+        <button class="confirm-btn" @click="startTraining">开始训练</button>
+      </div>
+    </div>
+  </div>
+
+
   <div class="main-container">
     <!-- 左侧运动列表 -->
     <div class="exercise-list">
@@ -19,14 +44,16 @@
           <div class="exercise-header">
             <h5>{{ exercise.type }} {{ exercise.name }}</h5>
             <span class="status-indicator">
-            <span v-if="index < currentIndex">✅ 已完成</span>
-            <span v-else-if="index === currentIndex">▶️ 进行中</span>
-            <span v-else>⏳ 待完成</span>
-          </span>
-        </div>
+              <template v-if="index < currentIndex">✅ 已完成</template>
+              <template v-else-if="index === currentIndex">
+                ▶️ 进行中
+                <span class="repeat-progress">({{ currentRepeat + 1 }}/{{ localRepeatTimes }})</span>
+              </template>
+              <template v-else>⏳ 待完成</template>
+            </span>
+          </div>
         <!-- <p v-if="index === currentIndex">{{ exercise.duration }}</p> -->
-      </div>
-      <div v-if="index === currentIndex" > </div>
+        </div>
       </div>
     </div>
 
@@ -38,12 +65,13 @@
           class="control-btn end-btn"
           @click="endSession"
         >
-          结束计划
+          结束训练
         </button>
         <button
           class="control-btn pause-btn"
           @click="togglePlay"
           :disabled="!canPlay"
+          :class="{ 'paused-state': !isPlaying }"
         >
           {{ isPlaying ? '暂停视频' : '播放视频' }}
         </button>
@@ -63,7 +91,7 @@
       </div>
 
       <!-- 视频容器 -->
-      <div class="video-wrapper">
+      <div class="video-wrapper" v-show="!showRepeatDialog">
         <!-- 顶部导航按钮 -->
         <div class="navigation-controls">
           <button
@@ -78,7 +106,7 @@
             @click="nextExercise"
             :disabled="currentIndex === exercises.length - 1"
           >
-            {{ isLastExercise ? '完成计划' : '下一个' }} →
+            {{ isLastExercise ? '完成训练' : '下一个' }} →
           </button>
         </div>
 
@@ -98,7 +126,7 @@
           </video>
         </div>
       </div>
-    </div>
+    </div>  <!-- 右侧视频区域 -->
 
     <!-- 完成弹窗 -->
     <div v-if="showCompletionDialog" class="completion-dialog">
@@ -116,8 +144,20 @@
 <script setup>
   import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 
-  const props = defineProps(['exercises'])
+  // const props = defineProps(['exercises'])
+  // 新增的repeatTimes prop和currentRepeat状态
+  const props = defineProps({
+    exercises: Array,
+    repeatTimes: {
+      type: Number,
+      default: 3
+    }
+  })
   const emit = defineEmits(['end'])
+
+  // 新增状态
+  const showRepeatDialog = ref(true)
+  const localRepeatTimes = ref(3)
 
   const currentIndex = ref(0)
   const isPlaying = ref(false)
@@ -131,8 +171,36 @@
   const totalExercises = computed(() => props.exercises.length)
   const completedCount = ref(0)
 
-
   const showCompletionDialog = ref(false)
+
+  const currentRepeat = ref(0) // 当前重复次数
+
+  // 新增方法
+  const adjustRepeat = (delta) => {
+    const newValue = localRepeatTimes.value + delta
+    if (newValue >= 1 && newValue <= 10) {
+      localRepeatTimes.value = newValue
+    }
+  }
+
+  const startTraining = () => {
+    showRepeatDialog.value = false
+    console.log('关闭重复次数设置弹窗startTraining')
+    console.log(isPlaying.value)
+    // 初始化播放状态
+    isPlaying.value = true
+    if (videoPlayer.value) {
+      videoPlayer.value.play()
+    }
+  }
+
+  const closeRepeatDialog = () => {
+    console.log('关闭重复次数设置弹窗')
+    console.log(isPlaying.value)
+    showRepeatDialog.value = false
+    // 恢复默认值
+    localRepeatTimes.value = 3
+  }
 
   // 计算当前视频源
   const videoSrc = computed(() => {
@@ -149,12 +217,20 @@
 
   // 视频播放结束处理
   const handleVideoEnded = () => {
-    nextExercise()
+    currentRepeat.value += 1
+
+    // if (currentRepeat.value < props.repeatTimes) {
+    if (currentRepeat.value < localRepeatTimes.value) {
+      // 重复播放当前视频
+      videoPlayer.value.play()
+    } else {
+      // 重置次数并切换下一个
+      currentRepeat.value = 0
+      nextExercise()
+    }
   }
 
   const isLastExercise = computed(() => currentIndex.value === props.exercises.length - 1)
-  // const canPlay = computed(() => !isPlaying.value || progress.value < 100)
-  // 修改canPlay计算属性
   const canPlay = computed(() => {
     return !!videoPlayer.value && videoSrc.value
   })
@@ -187,18 +263,7 @@
       isMuted.value = videoPlayer.value.muted
     }
   }
-  // // 切换视频时保持静音状态
-  // watch(videoSrc, () => {
-  //   if (videoPlayer.value) {
-  //     videoPlayer.value.muted = isMuted.value
-  //   }
-  // })
-  // // 初始化视频静音状态
-  // watch(videoPlayer, (player) => {
-  //   if (player) {
-  //     player.muted = isMuted.value
-  //   }
-  // })
+
   const handleVolumeChange = () => {
   if (videoPlayer.value) {
       isMuted.value = videoPlayer.value.muted
@@ -225,6 +290,7 @@
     if (!isLastExercise.value) {
       currentIndex.value++
       resetPlayState()
+      currentRepeat.value = 0 // 重置重复次数
     } else {
       console.log('触发 end 事件前')
       // emit('end')
@@ -238,6 +304,7 @@
   // 新增方法
   const restartTraining = () => {
     currentIndex.value = 0
+    currentRepeat.value = 0 // 重置重复次数
     showCompletionDialog.value = false
     resetPlayState()
 
@@ -294,6 +361,82 @@
 </script>
 
 <style scoped>
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  color: #333;
+  transform: scale(1.1);
+}
+
+.repeat-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.repeat-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: #2196f3;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.repeat-btn:hover {
+  background: #1976d2;
+  transform: scale(1.1);
+}
+
+.repeat-input {
+  width: 80px;
+  height: 40px;
+  text-align: center;
+  font-size: 20px;
+  border: 2px solid #2196f3;
+  border-radius: 8px;
+  -moz-appearance: textfield;
+}
+
+.repeat-input::-webkit-outer-spin-button,
+.repeat-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.confirm-btn {
+  background: #4CAF50;
+  padding: 12px 30px;
+  font-size: 16px;
+  border-radius: 6px;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.confirm-btn:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76,175,80,0.3);
+}
+
 /* 基础布局 */
 .main-container {
   display: grid;
@@ -463,6 +606,16 @@ video {
   color: white;
   box-shadow: 0 4px 12px rgba(255,68,68,0.25);
 }
+.pause-btn.paused-state {
+  background: linear-gradient(135deg, #ff4444, #ff0000);
+  box-shadow: 0 4px 12px rgba(251,140,0,0.25);
+}
+
+/* 调整hover效果 */
+.pause-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(0,0,0,0.15);
+}
 
 /* 导航按钮 */
 .navigation-controls {
@@ -596,5 +749,20 @@ button:hover:not(:disabled) {
 .finish-btn:hover {
   background: #d32f2f;
   transform: translateY(-2px);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.repeat-progress {
+  font-size: 1em;
+  color: #66b3ff;
+  background: rgba(0,0,0,0.05);
+  padding: 0px 6px;
+  border-radius: 4px;
+  margin-left: 0rem;
 }
 </style>

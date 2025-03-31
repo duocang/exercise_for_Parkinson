@@ -1,10 +1,11 @@
 // vue.config.js
 module.exports = {
-    publicPath: '/action/',
+    // publicPath: '/action/',
+    publicPath: process.env.NODE_ENV === 'production' ? '/action/' : '/',
     productionSourceMap: false,
     devServer: {
         // 开发环境下需要配置路径匹配
-        publicPath: '/action/',
+        // publicPath: '/action/',
         historyApiFallback: {
             disableDotRule: true,
             rewrites: [
