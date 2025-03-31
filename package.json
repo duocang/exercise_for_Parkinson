@@ -1,0 +1,21 @@
+{
+  "name": "exercise-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "generate": "node script/generate-exercises.js",
+    "serve": "npm run generate && vue-cli-service serve",
+    "build": "npm run generate && vue-cli-service build",
+    "build1": "npm run generate && vite build"
+  },
+  "dependencies": {
+    "vue": "^3.4.21"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/cli-service": "^5.0.8",
+    "@vue/compiler-sfc": "^3.4.21",
+    "vite": "^6.2.3",
+    "vite-plugin-vue-devtools": "^7.7.2"
+  }
+}
