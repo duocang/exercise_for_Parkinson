@@ -155,13 +155,11 @@
   })
   const emit = defineEmits(['end'])
 
-  // 新增状态
-  const showRepeatDialog = ref(true)
-  const localRepeatTimes = ref(3)
-
   const currentIndex = ref(0)
   const isPlaying = ref(false)
   const isMuted = ref(false)
+  const showRepeatDialog = ref(true)
+  const localRepeatTimes = ref(2)
 
   let intervalId = null
   const videoPlayer = ref(null)
